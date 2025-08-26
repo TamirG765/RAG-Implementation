@@ -60,10 +60,10 @@ pip install -r requirements.txt
 ### Index Documents
 ```bash
 # Index a PDF with sentence-based chunking
-python index_documents.py --file "document.pdf" --strategy sentence
+python index_documents.py --file "/Path/to/the/file/document.pdf" --strategy sentence
 
 # Index a DOCX with fixed-size chunks  
-python index_documents.py --file "report.docx" --strategy fixed
+python index_documents.py --file "test.docx" --strategy fixed
 ```
 
 **Chunking strategies:**
