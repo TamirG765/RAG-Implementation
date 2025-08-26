@@ -11,13 +11,15 @@ A Retrieval-Augmented Generation (RAG) system that converts PDF and DOCX documen
 
 - **Document Support**: PDF and DOCX files
 - **Chunking Strategies**: Fixed-size, sentence-based, or paragraph-based splitting
-- **Vector Embeddings**: Gemini `text-embedding-004` model (768 dimensions)
+- **Vector Embeddings**: Gemini `text-embedding-004` model
 - **Similarity Search**: Cosine similarity using PostgreSQL pgvector extension
 - **Interactive Search**: Command-line interface for querying indexed documents
 
 ---
 
 ## Quick Setup
+
+### 0. Install Docker on your machine
 
 ### 1. Database (PostgreSQL + pgvector)
 ```bash
@@ -75,13 +77,3 @@ python index_documents.py --file "report.docx" --strategy fixed
 python search_documents.py
 ```
 Enter queries to find semantically similar content from indexed documents. Returns top-5 matches with similarity scores.
-
----
-
-## Technical Details
-
-- **Embedding Model**: Gemini `text-embedding-004` (768D vectors)
-- **Database**: PostgreSQL 16 with pgvector extension
-- **Similarity Metric**: Cosine distance (`1 - (embedding <=> query_embedding)`)
-- **Chunk Size**: 800 characters (fixed strategy) with 200 character overlap
-- **Connection**: Modern `psycopg` adapter with connection pooling
