@@ -48,12 +48,12 @@ GEMINI_API_KEY="your_gemini_api_key_here"
 # Create environment
 conda create -n rag python=3.11
 conda activate rag
+```
 
-# Install packages
 ```bash
+# Install packages
 pip install -r requirements.txt
-
----
+```
 
 ## Usage
 
