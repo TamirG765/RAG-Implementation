@@ -76,4 +76,4 @@ python index_documents.py --file "report.docx" --strategy fixed
 # Start interactive search
 python search_documents.py
 ```
-Enter queries to find semantically similar content from indexed documents. Returns top-5 matches with similarity scores.
+Enter queries to find semantically similar content from indexed documents.</br>Returns top-5 matches with similarity scores.
