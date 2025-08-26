@@ -4,16 +4,6 @@ This guide explains how to **run `index_documents.py` end-to-end**: installing d
 
 ---
 
-## 📦 Python Dependencies
-
-Install the required packages inside your project’s virtual environment (e.g., conda env `jeen`).
-
-```bash
-pip install psycopg pgvector pypdf python-docx google-generativeai tenacity python-dotenv nltk
-```
-
----
-
 ## 🐘 PostgreSQL via Docker
 
 We’ll run PostgreSQL with the `pgvector` extension preinstalled using Docker.
@@ -98,28 +88,12 @@ Valid strategies:
 
 Example:
 ```bash
-python index_documents.py --file "/Users/tamir_gez/Downloads/Jeen AI Solution.pdf" --strategy sentence
+python index_documents.py --file "/test.docx" --strategy sentence
 ```
 
----
-
-## ✅ Verify Inserted Chunks
-
-Check if chunks were written to the database:
+Now that we have the Database ready, we can run the search script:
 
 ```bash
-docker exec -it rag-pg psql -U postgres -d ragdb \
-  -c "SELECT id, left(chunk_text, 80) AS preview, split_strategy, created_at FROM indexed_chunks ORDER BY id DESC LIMIT 5;"
+python search_documents.py
 ```
-
 ---
-
-## 🚨 Common Issues
-
-- **`connection refused on port 5432`** → Ensure Docker container is running. Start with:
-  ```bash
-  docker start rag-pg
-  ```
-- **`permission denied to create extension "vector"`** → You must use the `postgres` superuser (the default in our Docker run).
-- **`GEMINI_API_KEY not set`** → Export your key correctly before running.
-- **Scanned PDFs return no text** → Add OCR preprocessing (not included yet).

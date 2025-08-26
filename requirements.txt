@@ -1,0 +1,8 @@
+psycopg
+pgvector
+pypdf
+python-docx
+google-generativeai
+tenacity
+python-dotenv
+nltk
