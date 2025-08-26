@@ -50,6 +50,7 @@ conda create -n rag python=3.11
 conda activate rag
 
 # Install packages
+```bash
 pip install -r requirements.txt
 ```
 
@@ -67,9 +68,9 @@ python index_documents.py --file "report.docx" --strategy fixed
 ```
 
 **Chunking strategies:**
-- `fixed` - 800 chars with 200 char overlap
-- `sentence` - Natural sentence boundaries 
-- `paragraph` - Paragraph-based splitting
+- `fixed` - 800 chars with 200 char overlap using LangChain CharacterTextSplitter
+- `sentence` - 100 chars with 25 char overlap using LangChain RecursiveCharacterTextSplitter with sentence separators
+- `paragraph` - 800 chars with 200 char overlap using LangChain CharacterTextSplitter with paragraph separators
 
 ### Search Documents
 ```bash

@@ -5,4 +5,4 @@ python-docx
 google-generativeai
 tenacity
 python-dotenv
-nltk
+langchain-text-splitters

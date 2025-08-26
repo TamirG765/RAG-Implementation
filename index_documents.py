@@ -19,7 +19,6 @@ Table: indexed_chunks
 from __future__ import annotations
 
 import argparse
-import dataclasses
 import logging
 import os
 import re
@@ -175,141 +174,63 @@ def extract_text(file_path: str) -> str:
         return extract_text_docx(file_path)
     raise AssertionError("unreachable")
 
+# --- LangChain Text Splitters -------------------------------------------------
+try:
+    from langchain_text_splitters import (
+        CharacterTextSplitter,
+        RecursiveCharacterTextSplitter,
+    )
+    _HAS_LANGCHAIN = True
+except Exception:
+    _HAS_LANGCHAIN = False
 
-# --- Chunking strategies ------------------------------------------------------
 
-@dataclasses.dataclass
-class ChunkingConfig:
-    chunk_size: int = CHUNK_SIZE
-    overlap: int = CHUNK_OVERLAP
-
-
-def split_text(text: str, strategy: str, cfg: ChunkingConfig | None = None) -> List[str]:
-    """Returns a list of chunk strings according to strategy."""
-    cfg = cfg or ChunkingConfig()
+def split_text(text: str, strategy: str) -> List[str]:
+    """Returns a list of chunk strings according to strategy.
+    Prefers LangChain splitters when available; otherwise falls back to local implementations.
+    """
     strategy = strategy.lower()
+
+    if _HAS_LANGCHAIN:
+        if strategy == "fixed":
+            splitter = CharacterTextSplitter(
+                separator=" ",
+                chunk_size=CHUNK_SIZE,
+                chunk_overlap=CHUNK_OVERLAP,
+                length_function=len,
+            )
+            return [c for c in splitter.split_text(text) if c.strip()]
+
+        if strategy == "sentence":
+            CHUNK_SIZE = 100
+            CHUNK_OVERLAP = 25
+            splitter = RecursiveCharacterTextSplitter(
+                chunk_size=CHUNK_SIZE,
+                chunk_overlap=CHUNK_OVERLAP,
+                separators=[". ", "! ", "? ", "\n"]
+            )
+            return [c.strip() for c in splitter.split_text(text) if c.strip()]
+
+        if strategy == "paragraph":
+            splitter = CharacterTextSplitter(
+                separator="\n\n",
+                chunk_size=CHUNK_SIZE,
+                chunk_overlap=CHUNK_OVERLAP,
+                length_function=len,
+            )
+            return [c for c in splitter.split_text(text) if c.strip()]
+
+    # Fallback to local implementations if LangChain isn't available
     if strategy == "fixed":
-        return chunk_fixed(text, cfg.chunk_size, cfg.overlap)
+        return chunk_fixed(text, CHUNK_SIZE, CHUNK_OVERLAP)
     if strategy == "sentence":
-        return chunk_by_sentences(text, cfg.chunk_size, cfg.overlap)
+        return chunk_by_sentences(text, CHUNK_SIZE, CHUNK_OVERLAP)
     if strategy == "paragraph":
-        return chunk_by_paragraphs(text, cfg.chunk_size, cfg.overlap)
+        return chunk_by_paragraphs(text, CHUNK_SIZE, CHUNK_OVERLAP)
+
     raise ValueError("strategy must be one of: fixed | sentence | paragraph")
 
-
-def chunk_fixed(text: str, chunk_size: int, overlap: int) -> List[str]:
-    """Character-based sliding window with overlap."""
-    chunks: List[str] = []
-    n = len(text)
-    if n == 0:
-        return chunks
-    i = 0
-    while i < n:
-        chunk = text[i : i + chunk_size]
-        chunk = chunk.strip()
-        if chunk:
-            chunks.append(chunk)
-        # Move by chunk_size - overlap, but at least 1
-        step = max(1, chunk_size - overlap)
-        i += step
-    return chunks
-
-
-# Optional: try NLTK sentence split; fallback to regex
-try:
-    import nltk
-    try:
-        nltk.data.find('tokenizers/punkt')
-    except LookupError:
-        nltk.download('punkt', quiet=True)
-    # New: ensure punkt_tab for newer NLTK versions
-    try:
-        nltk.data.find('tokenizers/punkt_tab')
-    except LookupError:
-        nltk.download('punkt_tab', quiet=True)
-    _HAS_NLTK = True
-except Exception:
-    _HAS_NLTK = False
-
-
-def _split_sentences(text: str) -> List[str]:
-    if _HAS_NLTK:
-        try:
-            from nltk.tokenize import sent_tokenize
-            return [s.strip() for s in sent_tokenize(text) if s.strip()]
-        except LookupError:
-            # punkt/punkt_tab may be missing at runtime; fall back to regex
-            pass
-    
-    # naive regex-based sentence segmentation
-    sents = re.split(r"(?<=[.!?])\s+", text)
-    return [s.strip() for s in sents if s.strip()]
-
-
-def pack_units(units: List[str], target_len: int, overlap: int, sep: str = " ") -> List[str]:
-    """Greedily packs units (sentences/paragraphs) into ~target_len char windows with char overlap.
-    Overlap is applied on the final character stream, approximated by carrying the last `overlap`
-    characters of the previous chunk as a prefix to the next one.
-    """
-    if not units:
-        return []
-    joined = []
-    current = []
-    current_len = 0
-
-    def flush():
-        nonlocal current, current_len
-        if not current:
-            return None
-        chunk = sep.join(current).strip()
-        current = []
-        current_len = 0
-        return chunk
-
-    for u in units:
-        ulen = len(u) + (0 if not current else len(sep))
-        if current_len + ulen <= target_len:
-            current.append(u)
-            current_len += ulen
-        else:
-            chunk = flush()
-            if chunk:
-                joined.append(chunk)
-            # start new with overlap prefix from previous chunk
-            if joined:
-                overlap_src = joined[-1][-overlap:] if overlap > 0 else ""
-                current = [overlap_src, u] if overlap_src else [u]
-                # compute length again
-                current_len = len(overlap_src) + (len(sep) if overlap_src and u else 0) + len(u)
-            else:
-                current = [u]
-                current_len = len(u)
-    last = flush()
-    if last:
-        joined.append(last)
-    # Final trim & filter
-    return [c.strip() for c in joined if c and c.strip()]
-
-
-def chunk_by_sentences(text: str, target_len: int, overlap: int) -> List[str]:
-    sentences = _split_sentences(text)
-    return pack_units(sentences, target_len, overlap, sep=" ")
-
-
-def _split_paragraphs(text: str) -> List[str]:
-    parts = re.split(r"\n\n+", text)
-    return [p.strip() for p in parts if p.strip()]
-
-
-def chunk_by_paragraphs(text: str, target_len: int, overlap: int) -> List[str]:
-    paras = _split_paragraphs(text)
-    return pack_units(paras, target_len, overlap, sep="\n\n")
-
-
 # --- Embeddings via Gemini ----------------------------------------------------
-
-# We use google-generativeai's embed_content API. We do a simple per-chunk loop with
-# retries to keep the code portable.
 
 try:
     import google.generativeai as genai
