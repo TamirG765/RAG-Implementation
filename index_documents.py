@@ -1,5 +1,5 @@
 """
-index_documents.py — Single-table indexer for RAG
+index_documents.py — Table indexer for RAG
 
 Purpose
 -------
@@ -7,28 +7,14 @@ Ingest a PDF/DOCX file, split it into chunks (one of: fixed|sentence|paragraph),
 create Gemini embeddings for each chunk, and persist rows into a single
 PostgreSQL table with pgvector.
 
-Only two runtime inputs are configurable: `file_path` and `strategy`.
-Everything else is fixed as constants below (DB URL, model name, chunk sizes, etc.).
-
 Table: indexed_chunks
 ---------------------
 - id BIGSERIAL PRIMARY KEY
-- chunk_text TEXT NOT NULL
+- chunk_text TEXT
 - embedding VECTOR(768)
-- file_name TEXT NOT NULL
-- split_strategy TEXT NOT NULL
+- file_name TEXT
+- split_strategy TEXT
 - created_at TIMESTAMPTZ DEFAULT NOW()
-
-Usage
------
-python index_documents.py --file ./sample.pdf --strategy sentence
-
-Notes
------
-- `POSTGRES_URL` and `GEMINI_API_KEY` are read from environment variables (or fall back
-  to placeholders defined in constants). You only pass `--file` and `--strategy`.
-- The code creates the schema if it doesn't exist.
-- If `nltk` isn't installed, we use a simple regex sentence splitter.
 """
 from __future__ import annotations
 
@@ -42,22 +28,19 @@ import time
 from typing import Iterable, List
 import time
 
-# Optional .env support
 try:
-    from dotenv import load_dotenv  # type: ignore
+    from dotenv import load_dotenv 
     load_dotenv()
 except Exception:
     pass
 
-# Fixed configuration (only file_path & strategy are CLI-configurable)
-CHUNK_SIZE = 800          # approximate characters per chunk for packing
+CHUNK_SIZE = 800          # characters per chunk for packing
 CHUNK_OVERLAP = 200       # overlap in characters between adjacent chunks
 EMBED_MODEL = "models/text-embedding-004"  # Gemini embedding model
 EMBED_DIM = 768
 BATCH_SIZE = 64
 EMBED_SLEEP = 7
 
-# Secrets / connection strings: read from env, fallback to placeholders
 POSTGRES_URL = os.environ.get("POSTGRES_URL", "postgresql://postgres:postgres@localhost:5432/ragdb")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
@@ -76,7 +59,7 @@ def setup_logger(level: str = "INFO") -> None:
 try:
     import psycopg
     from psycopg import sql
-    from pgvector.psycopg import register_vector  # type: ignore
+    from pgvector.psycopg import register_vector  
 except Exception as e:  # pragma: no cover
     print("ERROR: psycopg and pgvector are required. `pip install psycopg pgvector`", file=sys.stderr)
     raise
@@ -111,11 +94,6 @@ def ensure_schema(conn) -> None:
             ON indexed_chunks (split_strategy, created_at);
             """
         )
-        # Optional: build a vector index later when you have enough data
-        # cur.execute(
-        #     "CREATE INDEX IF NOT EXISTS idx_indexed_chunks_embedding "
-        #     "ON indexed_chunks USING ivfflat (embedding vector_l2_ops) WITH (lists = 100);"
-        # )
     conn.commit()
 
 
@@ -240,11 +218,16 @@ def chunk_fixed(text: str, chunk_size: int, overlap: int) -> List[str]:
 
 # Optional: try NLTK sentence split; fallback to regex
 try:
-    import nltk  # type: ignore
+    import nltk
     try:
         nltk.data.find('tokenizers/punkt')
     except LookupError:
         nltk.download('punkt', quiet=True)
+    # New: ensure punkt_tab for newer NLTK versions
+    try:
+        nltk.data.find('tokenizers/punkt_tab')
+    except LookupError:
+        nltk.download('punkt_tab', quiet=True)
     _HAS_NLTK = True
 except Exception:
     _HAS_NLTK = False
@@ -252,8 +235,13 @@ except Exception:
 
 def _split_sentences(text: str) -> List[str]:
     if _HAS_NLTK:
-        from nltk.tokenize import sent_tokenize  # type: ignore
-        return [s.strip() for s in sent_tokenize(text) if s.strip()]
+        try:
+            from nltk.tokenize import sent_tokenize
+            return [s.strip() for s in sent_tokenize(text) if s.strip()]
+        except LookupError:
+            # punkt/punkt_tab may be missing at runtime; fall back to regex
+            pass
+    
     # naive regex-based sentence segmentation
     sents = re.split(r"(?<=[.!?])\s+", text)
     return [s.strip() for s in sents if s.strip()]

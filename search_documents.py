@@ -20,9 +20,8 @@ import os
 import sys
 from typing import List, Dict, Any
 
-# Optional .env support
 try:
-    from dotenv import load_dotenv  # type: ignore
+    from dotenv import load_dotenv
     load_dotenv()
 except Exception:
     pass
@@ -49,7 +48,7 @@ def setup_logger(level: str = "INFO") -> None:
 
 try:
     import psycopg
-    from pgvector.psycopg import register_vector, Vector  # type: ignore
+    from pgvector.psycopg import register_vector, Vector
 except Exception as e:  # pragma: no cover
     print("ERROR: psycopg and pgvector are required. `pip install psycopg pgvector`", file=sys.stderr)
     raise
@@ -64,14 +63,14 @@ def get_db_conn():
 # --- Embeddings (Gemini) ------------------------------------------------------
 
 try:
-    import google.generativeai as genai  # type: ignore
+    import google.generativeai as genai
     _HAS_GEMINI = True
 except Exception:
     _HAS_GEMINI = False
 
 try:
-    from tenacity import retry, wait_exponential_jitter, stop_after_attempt  # type: ignore
-except Exception:  # pragma: no cover
+    from tenacity import retry, wait_exponential_jitter, stop_after_attempt
+except Exception:
     def retry(*args, **kwargs):
         def deco(fn):
             return fn
@@ -91,13 +90,13 @@ def _require_gemini():
 
 def _configure_gemini():
     _require_gemini()
-    genai.configure(api_key=GEMINI_API_KEY)  # type: ignore
+    genai.configure(api_key=GEMINI_API_KEY)
 
 
 @retry(wait=wait_exponential_jitter(1, 4, 0.1), stop=stop_after_attempt(5))
 def embed_query(text: str) -> List[float]:
     _configure_gemini()
-    resp = genai.embed_content(model=EMBED_MODEL, content=text)  # type: ignore
+    resp = genai.embed_content(model=EMBED_MODEL, content=text)
     vec = getattr(resp, "embedding", None) or resp.get("embedding")
     if not isinstance(vec, list):
         raise RuntimeError("Unexpected embedding response format from Gemini")

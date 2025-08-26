@@ -9,27 +9,16 @@ This guide explains how to **run `index_documents.py` end-to-end**: installing d
 Install the required packages inside your project’s virtual environment (e.g., conda env `jeen`).
 
 ```bash
-pip install psycopg pgvector pypdf python-docx google-generativeai tenacity python-dotenv
+pip install psycopg pgvector pypdf python-docx google-generativeai tenacity python-dotenv nltk
 ```
-
-### Packages explained:
-- **psycopg** → PostgreSQL driver
-- **pgvector** → Python client support for pgvector
-- **pypdf** → PDF text extraction
-- **python-docx** → DOCX text extraction
-- **google-generativeai** → Gemini API client
-- **tenacity** → Retry logic
-- **python-dotenv** → Load `.env` files for secrets
 
 ---
 
-## 🐘 PostgreSQL + pgvector via Docker
+## 🐘 PostgreSQL via Docker
 
 We’ll run PostgreSQL with the `pgvector` extension preinstalled using Docker.
 
-### Step 1: Install Docker
-- **macOS**: Install [Docker Desktop](https://www.docker.com/products/docker-desktop/).
-- **Windows**: Install Docker Desktop with WSL2 backend enabled.
+### Step 1: Install Docker locally (if not already installed)
 
 ### Step 2: Run the container
 Execute this in **Terminal (macOS)** or **PowerShell (Windows)**:
@@ -50,10 +39,8 @@ docker run --name rag-pg \
 - Database: `ragdb`
 - Volume: `rag_pg_data` (persistent storage)
 
-> ⚠️ If port `5432` is busy, change `-p 5432:5432` → `-p 5433:5432` and update your `POSTGRES_URL` accordingly.
 
-
-### Step 3: Verify DB is running
+### Step 3: Verify DB is running (optional)
 ```bash
 docker exec -it rag-pg psql -U postgres -d ragdb -c "SELECT version();"
 ```
@@ -65,13 +52,11 @@ Once connected to the database, enable the pgvector extension (one-time setup):
 docker exec -it rag-pg psql -U postgres -d ragdb -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
-This creates the `vector` type inside your database so embeddings can be stored.
+> This creates the `vector` type inside your database so embeddings can be stored.
 
 ---
 
 ## 🔑 Environment Variables
-
-The script reads config from environment variables. Set them before running.
 
 ### macOS/Linux (zsh/bash):
 ```bash
@@ -89,7 +74,18 @@ $env:GEMINI_API_KEY = "<your_gemini_api_key_here>"
 
 ## ▶️ Run the Script
 
-From inside your environment (`conda activate jeen`):
+create a virtual environment and activate it:
+
+```bash
+conda create -n rag
+conda activate rag
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
 
 ```bash
 python index_documents.py --file "/path/to/your/document.pdf" --strategy fixed
