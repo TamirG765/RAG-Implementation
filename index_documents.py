@@ -26,7 +26,6 @@ import re
 import sys
 import time
 from typing import Iterable, List
-import time
 
 try:
     from dotenv import load_dotenv 
@@ -49,7 +48,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 def setup_logger(level: str = "INFO") -> None:
     logging.basicConfig(
         level=getattr(logging, level.upper(), logging.INFO),
-        format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+        format="%(asctime)s | %(levelname)s | %(message)s",
         datefmt="%H:%M:%S",
     )
 
@@ -116,14 +115,14 @@ def insert_rows(conn, file_name: str, strategy: str, rows: List[tuple[str, list[
 
 # PDF & DOCX readers
 try:
-    from pypdf import PdfReader  # type: ignore
-except Exception as e:  # pragma: no cover
-    PdfReader = None  # type: ignore
+    from pypdf import PdfReader
+except Exception as e:
+    PdfReader = None
 
 try:
-    from docx import Document  # type: ignore
-except Exception as e:  # pragma: no cover
-    Document = None  # type: ignore
+    from docx import Document
+except Exception as e:
+    Document = None
 
 
 def detect_file_type(path: str) -> str:
@@ -313,23 +312,18 @@ def chunk_by_paragraphs(text: str, target_len: int, overlap: int) -> List[str]:
 # retries to keep the code portable.
 
 try:
-    import google.generativeai as genai  # type: ignore
+    import google.generativeai as genai
     _HAS_GEMINI = True
 except Exception:
     _HAS_GEMINI = False
 
 try:
-    from tenacity import retry, wait_exponential_jitter, stop_after_attempt  # type: ignore
-except Exception:  # pragma: no cover
+    from tenacity import retry, wait_exponential_jitter, stop_after_attempt
+except Exception:
     # Provide light fallback if tenacity isn't available
     def retry(*args, **kwargs):
-        def deco(fn):
-            return fn
-        return deco
-    def wait_exponential_jitter(*args, **kwargs):  # type: ignore
-        return None
-    def stop_after_attempt(*args, **kwargs):  # type: ignore
-        return None
+        return lambda fn: fn
+    wait_exponential_jitter = stop_after_attempt = lambda *args, **kwargs: None
 
 
 def _require_gemini():
@@ -345,7 +339,7 @@ def _require_gemini():
 
 def _configure_gemini():
     _require_gemini()
-    genai.configure(api_key=GEMINI_API_KEY)  # type: ignore
+    genai.configure(api_key=GEMINI_API_KEY)
 
 
 @retry(wait=wait_exponential_jitter(1, 4, 0.1), stop=stop_after_attempt(5))
@@ -353,7 +347,7 @@ def _embed_one(text: str) -> List[float]:
     """Embed a single chunk with retries. Returns a list of floats."""
     _configure_gemini()
     # The SDK typically expects model names prefixed with "models/"
-    resp = genai.embed_content(model=EMBED_MODEL, content=text)  # type: ignore
+    resp = genai.embed_content(model=EMBED_MODEL, content=text)
     # Some SDK versions return dict; others return object with .embedding
     vec = getattr(resp, "embedding", None) or resp.get("embedding")
     if not isinstance(vec, list):

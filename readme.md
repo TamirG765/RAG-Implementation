@@ -1,19 +1,27 @@
-# RAG Indexing Setup Guide
+# RAG Document Search System
 
-This guide explains how to **run `index_documents.py` end-to-end**: installing dependencies, setting up PostgreSQL with `pgvector` (via Docker), configuring environment variables, and executing the script.
+A Retrieval-Augmented Generation (RAG) system that converts PDF and DOCX documents into vector embeddings and enables semantic search over the content using PostgreSQL with pgvector.
+
+## How It Works
+
+1. **Index Documents** (`index_documents.py`) - Extracts text from PDF/DOCX files, splits into chunks, generates embeddings using Gemini, and stores in PostgreSQL
+2. **Search Documents** (`search_documents.py`) - Performs semantic similarity search using cosine distance to find relevant content
+
+## Features
+
+- **Document Support**: PDF and DOCX files
+- **Chunking Strategies**: Fixed-size, sentence-based, or paragraph-based splitting
+- **Vector Embeddings**: Gemini `text-embedding-004` model (768 dimensions)
+- **Similarity Search**: Cosine similarity using PostgreSQL pgvector extension
+- **Interactive Search**: Command-line interface for querying indexed documents
 
 ---
 
-## 🐘 PostgreSQL via Docker
+## Quick Setup
 
-We’ll run PostgreSQL with the `pgvector` extension preinstalled using Docker.
-
-### Step 1: Install Docker locally (if not already installed)
-
-### Step 2: Run the container
-Execute this in **Terminal (macOS)** or **PowerShell (Windows)**:
-
+### 1. Database (PostgreSQL + pgvector)
 ```bash
+# Run PostgreSQL with pgvector extension
 docker run --name rag-pg \
   -e POSTGRES_USER=postgres \
   -e POSTGRES_PASSWORD=postgres \
@@ -21,86 +29,59 @@ docker run --name rag-pg \
   -p 5432:5432 \
   -v rag_pg_data:/var/lib/postgresql/data \
   -d pgvector/pgvector:pg16
-```
 
-- Exposes Postgres on `localhost:5432`
-- User: `postgres`
-- Password: `postgres`
-- Database: `ragdb`
-- Volume: `rag_pg_data` (persistent storage)
-
-
-### Step 3: Verify DB is running (optional)
-```bash
-docker exec -it rag-pg psql -U postgres -d ragdb -c "SELECT version();"
-```
-
-### Step 4: Enable the vector extension
-Once connected to the database, enable the pgvector extension (one-time setup):
-
-```bash
+# Enable vector extension (one-time)
 docker exec -it rag-pg psql -U postgres -d ragdb -c "CREATE EXTENSION IF NOT EXISTS vector;"
 ```
 
-> This creates the `vector` type inside your database so embeddings can be stored.
-
----
-
-## 🔑 Environment Variables
-
-### macOS/Linux (zsh/bash):
-```bash
-export POSTGRES_URL="postgresql://postgres:postgres@localhost:5432/ragdb"
-export GEMINI_API_KEY="<your_gemini_api_key_here>"
-```
-
-### Windows (PowerShell):
-```powershell
-$env:POSTGRES_URL = "postgresql://postgres:postgres@localhost:5432/ragdb"
-$env:GEMINI_API_KEY = "<your_gemini_api_key_here>"
-```
-
-### Or just create a `.env` file in the root directory with the following content:
-
+### 2. Environment Variables
+Create a `.env` file:
 ```bash
 POSTGRES_URL="postgresql://postgres:postgres@localhost:5432/ragdb"
-GEMINI_API_KEY="<your_gemini_api_key_here>"
+GEMINI_API_KEY="your_gemini_api_key_here"
 ```
 
----
-
-## ▶️ Run the Script
-
-create a virtual environment and activate it:
-
+### 3. Install Dependencies
 ```bash
-conda create -n rag
+# Create environment
+conda create -n rag python=3.11
 conda activate rag
-```
 
-Install dependencies:
-
-```bash
+# Install packages
 pip install -r requirements.txt
 ```
 
+---
+
+## Usage
+
+### Index Documents
 ```bash
-python index_documents.py --file "/path/to/your/document.pdf" --strategy fixed
+# Index a PDF with sentence-based chunking
+python index_documents.py --file "document.pdf" --strategy sentence
+
+# Index a DOCX with fixed-size chunks  
+python index_documents.py --file "report.docx" --strategy fixed
 ```
 
-Valid strategies:
-- `fixed`
-- `sentence`
-- `paragraph`
+**Chunking strategies:**
+- `fixed` - 800 chars with 200 char overlap
+- `sentence` - Natural sentence boundaries 
+- `paragraph` - Paragraph-based splitting
 
-Example:
+### Search Documents
 ```bash
-python index_documents.py --file "/test.docx" --strategy sentence
-```
-
-Now that we have the Database ready, we can run the search script:
-
-```bash
+# Start interactive search
 python search_documents.py
 ```
+Enter queries to find semantically similar content from indexed documents. Returns top-5 matches with similarity scores.
+
 ---
+
+## Technical Details
+
+- **Embedding Model**: Gemini `text-embedding-004` (768D vectors)
+- **Database**: PostgreSQL 16 with pgvector extension
+- **Similarity Metric**: Cosine distance (`1 - (embedding <=> query_embedding)`)
+- **Chunk Size**: 800 characters (fixed strategy) with 200 character overlap
+- **Connection**: Modern `psycopg` adapter with connection pooling
