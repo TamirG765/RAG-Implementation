@@ -60,6 +60,13 @@ $env:POSTGRES_URL = "postgresql://postgres:postgres@localhost:5432/ragdb"
 $env:GEMINI_API_KEY = "<your_gemini_api_key_here>"
 ```
 
+### Or just create a `.env` file in the root directory with the following content:
+
+```bash
+POSTGRES_URL="postgresql://postgres:postgres@localhost:5432/ragdb"
+GEMINI_API_KEY="<your_gemini_api_key_here>"
+```
+
 ---
 
 ## ▶️ Run the Script
