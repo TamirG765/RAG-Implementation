@@ -22,6 +22,7 @@ A Retrieval-Augmented Generation (RAG) system that converts PDF and DOCX documen
 ### 0. Install Docker on your machine
 
 ### 1. Database (PostgreSQL + pgvector)
+In Terminal(Mac) or Command Prompt (Windows):
 ```bash
 # Run PostgreSQL with pgvector extension
 docker run --name rag-pg \
@@ -66,14 +67,12 @@ python index_documents.py --file "/Path/to/the/file/document.pdf" --strategy sen
 python index_documents.py --file "test.docx" --strategy fixed
 ```
 
-**Chunking strategies:**
-- `fixed` - 800 chars with 200 char overlap using LangChain CharacterTextSplitter
-- `sentence` - 100 chars with 25 char overlap using LangChain RecursiveCharacterTextSplitter with sentence separators
-- `paragraph` - 800 chars with 200 char overlap using LangChain CharacterTextSplitter with paragraph separators
-
 ### Search Documents
 ```bash
 # Start interactive search
 python search_documents.py
 ```
 Enter queries to find semantically similar content from indexed documents.</br>Returns top-5 matches with similarity scores.
+
+**Chunking strategies:**
+- `fixed` | `sentence` | `paragraph` --> Using LangChain Text Splitters for splitting the text into chunks
