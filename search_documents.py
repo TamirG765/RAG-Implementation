@@ -13,8 +13,6 @@ python search_documents.py
 # then type your question at the prompt (blank line to exit)
 
 """
-from __future__ import annotations
-
 import logging
 import os
 import sys
@@ -24,17 +22,16 @@ try:
     from dotenv import load_dotenv
     load_dotenv()
 except Exception:
-    pass
+    raise RuntimeError("dotenv is not installed. `pip install python-dotenv`")
 
-# --- Fixed configuration ------------------------------------------------------
 EMBED_MODEL = "models/text-embedding-004"
 EMBED_DIM = 768
 TOP_K = 5
 
-POSTGRES_URL = os.environ.get("POSTGRES_URL", "postgresql://postgres:postgres@localhost:5432/ragdb")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+POSTGRES_URL = os.getenv("POSTGRES_URL", "postgresql://postgres:postgres@localhost:5432/ragdb")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# --- Logging -----------------------------------------------------------------
+# Setup logger
 
 def setup_logger(level: str = "INFO") -> None:
     logging.basicConfig(
@@ -44,7 +41,7 @@ def setup_logger(level: str = "INFO") -> None:
     )
 
 
-# --- DB & pgvector ------------------------------------------------------------
+# Database connection
 
 try:
     import psycopg
@@ -60,7 +57,7 @@ def get_db_conn():
     return conn
 
 
-# --- Embeddings (Gemini) ------------------------------------------------------
+# Embeddings using Gemini API with retry logic
 
 try:
     import google.generativeai as genai
@@ -93,7 +90,7 @@ def _configure_gemini():
     genai.configure(api_key=GEMINI_API_KEY)
 
 
-@retry(wait=wait_exponential_jitter(1, 4, 0.1), stop=stop_after_attempt(5))
+# @retry(wait=wait_exponential_jitter(1, 4, 0.1), stop=stop_after_attempt(5))
 def embed_query(text: str) -> List[float]:
     _configure_gemini()
     resp = genai.embed_content(model=EMBED_MODEL, content=text)
@@ -105,7 +102,7 @@ def embed_query(text: str) -> List[float]:
     return [float(x) for x in vec]
 
 
-# --- Search -------------------------------------------------------------------
+# Search using cosine similarity
 
 def search_top_k(conn, query_embedding: List[float], top_k: int = TOP_K) -> List[Dict[str, Any]]:
     sql_query = (
@@ -134,6 +131,7 @@ def search_top_k(conn, query_embedding: List[float], top_k: int = TOP_K) -> List
             )
     return results
 
+# Main loop for interactive search
 
 def interactive_loop() -> None:
     print("\nType your question and press Enter. Empty input exits.\n")
@@ -141,10 +139,10 @@ def interactive_loop() -> None:
         try:
             q = input("Query> ").strip()
         except (EOFError, KeyboardInterrupt):
-            print("\nBye.")
+            print("\nBye for now.")
             return
         if not q:
-            print("Bye.")
+            print("Bye for now.")
             return
         try:
             qvec = embed_query(q)
@@ -153,18 +151,18 @@ def interactive_loop() -> None:
                 rows = search_top_k(conn, qvec, TOP_K)
             finally:
                 conn.close()
-            # Print results (only chunk_texts, plus a tiny header)
+            # Print results
             print("\nTop results:")
             for i, r in enumerate(rows, 1):
                 print(f"\n#{i} | sim={r['similarity']:.3f} | file={r['file_name']} | strategy={r['split_strategy']}")
-                print(r["chunk_text"])  # full chunk text as requested
+                print(r["chunk_text"])
             print("\n— End of results —\n")
         except Exception as e:
             logging.exception("Search failed: %s", e)
             print("(An error occurred; see logs.)")
 
 
-# --- Main ---------------------------------------------------------------------
+# Main
 
 def main() -> None:
     setup_logger()

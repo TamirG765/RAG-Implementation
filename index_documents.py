@@ -1,7 +1,7 @@
 """
 index_documents.py — Table indexer for RAG
 
-Purpose
+Gaol
 -------
 Ingest a PDF/DOCX file, split it into chunks (one of: fixed|sentence|paragraph),
 create Gemini embeddings for each chunk, and persist rows into a single
@@ -15,9 +15,11 @@ Table: indexed_chunks
 - file_name TEXT
 - split_strategy TEXT
 - created_at TIMESTAMPTZ DEFAULT NOW()
-"""
-from __future__ import annotations
 
+Usage
+-----
+python index_documents.py --file <something.pdf|.docx> --strategy <fixed|sentence|paragraph>
+"""
 import argparse
 import logging
 import os
@@ -30,19 +32,19 @@ try:
     from dotenv import load_dotenv 
     load_dotenv()
 except Exception:
-    pass
+    raise RuntimeError("dotenv is not installed. `pip install python-dotenv`")
 
-CHUNK_SIZE = 800          # characters per chunk for packing
-CHUNK_OVERLAP = 200       # overlap in characters between adjacent chunks
-EMBED_MODEL = "models/text-embedding-004"  # Gemini embedding model
+CHUNK_SIZE = 800                            # characters per chunk for packing
+CHUNK_OVERLAP = 200                         # overlap in characters between adjacent chunks
+EMBED_MODEL = "models/text-embedding-004"   # Gemini embedding model
 EMBED_DIM = 768
 BATCH_SIZE = 64
 EMBED_SLEEP = 7
 
-POSTGRES_URL = os.environ.get("POSTGRES_URL", "postgresql://postgres:postgres@localhost:5432/ragdb")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+POSTGRES_URL = os.getenv("POSTGRES_URL", "postgresql://postgres:postgres@localhost:5432/ragdb")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
-# --- Logging -----------------------------------------------------------------
+# Setup logger
 
 def setup_logger(level: str = "INFO") -> None:
     logging.basicConfig(
@@ -52,7 +54,7 @@ def setup_logger(level: str = "INFO") -> None:
     )
 
 
-# --- Database layer (psycopg + pgvector adapter) ------------------------------
+# Init database connection and schema
 
 try:
     import psycopg
@@ -110,7 +112,7 @@ def insert_rows(conn, file_name: str, strategy: str, rows: List[tuple[str, list[
     return len(rows)
 
 
-# --- File reading & normalization --------------------------------------------
+# Reading files & normalizing text
 
 # PDF & DOCX readers
 try:
@@ -174,7 +176,7 @@ def extract_text(file_path: str) -> str:
         return extract_text_docx(file_path)
     raise AssertionError("unreachable")
 
-# --- LangChain Text Splitters -------------------------------------------------
+# LangChain Text Splitters (fixed | sentence | paragraph)
 try:
     from langchain_text_splitters import (
         CharacterTextSplitter,
@@ -182,7 +184,7 @@ try:
     )
     _HAS_LANGCHAIN = True
 except Exception:
-    _HAS_LANGCHAIN = False
+    raise RuntimeError("langchain-text-splitters is not installed. `pip install langchain-text-splitters`")
 
 
 def split_text(text: str, strategy: str) -> List[str]:
@@ -202,11 +204,11 @@ def split_text(text: str, strategy: str) -> List[str]:
             return [c for c in splitter.split_text(text) if c.strip()]
 
         if strategy == "sentence":
-            CHUNK_SIZE = 100
-            CHUNK_OVERLAP = 25
+            SENTENCE_CHUNK_SIZE = 100
+            SENTENCE_CHUNK_OVERLAP = 25
             splitter = RecursiveCharacterTextSplitter(
-                chunk_size=CHUNK_SIZE,
-                chunk_overlap=CHUNK_OVERLAP,
+                chunk_size=SENTENCE_CHUNK_SIZE,
+                chunk_overlap=SENTENCE_CHUNK_OVERLAP,
                 separators=[". ", "! ", "? ", "\n"]
             )
             return [c.strip() for c in splitter.split_text(text) if c.strip()]
@@ -220,17 +222,7 @@ def split_text(text: str, strategy: str) -> List[str]:
             )
             return [c for c in splitter.split_text(text) if c.strip()]
 
-    # Fallback to local implementations if LangChain isn't available
-    if strategy == "fixed":
-        return chunk_fixed(text, CHUNK_SIZE, CHUNK_OVERLAP)
-    if strategy == "sentence":
-        return chunk_by_sentences(text, CHUNK_SIZE, CHUNK_OVERLAP)
-    if strategy == "paragraph":
-        return chunk_by_paragraphs(text, CHUNK_SIZE, CHUNK_OVERLAP)
-
-    raise ValueError("strategy must be one of: fixed | sentence | paragraph")
-
-# --- Embeddings via Gemini ----------------------------------------------------
+# Embeddings chunks using Gemini API
 
 try:
     import google.generativeai as genai
@@ -294,7 +286,7 @@ def embed_chunks(chunks: List[str]) -> List[List[float]]:
     return embeddings
 
 
-# --- Orchestration ------------------------------------------------------------
+# Pipeline with logging
 
 def run_indexing(file_path: str, strategy: str) -> None:
     start = time.time()
@@ -330,7 +322,7 @@ def run_indexing(file_path: str, strategy: str) -> None:
     logging.info("✅ Indexed %d chunks from %s (strategy=%s) in %.2fs", inserted, file_name, strategy, elapsed)
 
 
-# --- CLI ----------------------------------------------------------------------
+# CLI args
 
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Index a document into pgvector (single-table)")
