@@ -1,3 +1,5 @@
+![Demo](demo.gif)
+
 # RAG Document Search System
 
 A Retrieval-Augmented Generation (RAG) system that converts PDF and DOCX documents into vector embeddings and enables semantic search over the content using PostgreSQL with pgvector.
