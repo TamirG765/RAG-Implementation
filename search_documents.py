@@ -52,6 +52,7 @@ except Exception as e:  # pragma: no cover
 
 
 def get_db_conn():
+    """Open a new psycopg connection and register pgvector."""
     conn = psycopg.connect(POSTGRES_URL)
     register_vector(conn)
     return conn
@@ -90,8 +91,8 @@ def _configure_gemini():
     genai.configure(api_key=GEMINI_API_KEY)
 
 
-# @retry(wait=wait_exponential_jitter(1, 4, 0.1), stop=stop_after_attempt(5))
 def embed_query(text: str) -> List[float]:
+    """Generate embedding for search query using Gemini API."""
     _configure_gemini()
     resp = genai.embed_content(model=EMBED_MODEL, content=text)
     vec = getattr(resp, "embedding", None) or resp.get("embedding")
@@ -105,6 +106,7 @@ def embed_query(text: str) -> List[float]:
 # Search using cosine similarity
 
 def search_top_k(conn, query_embedding: List[float], top_k: int = TOP_K) -> List[Dict[str, Any]]:
+    """Find top-k most similar chunks using cosine similarity, returns list of dicts with chunk data and scores."""
     sql_query = (
         "SELECT id, file_name, split_strategy, created_at, chunk_text, "
         "1 - (embedding <=> %s) AS similarity "
@@ -134,6 +136,7 @@ def search_top_k(conn, query_embedding: List[float], top_k: int = TOP_K) -> List
 # Main loop for interactive search
 
 def interactive_loop() -> None:
+    """Main interactive search loop - prompts for queries and displays results."""
     print("\nType your question and press Enter. Empty input exits.\n")
     while True:
         try:
@@ -145,13 +148,13 @@ def interactive_loop() -> None:
             print("Bye for now.")
             return
         try:
-            qvec = embed_query(q)
+            qvec = embed_query(q)  # Convert query to embedding
             conn = get_db_conn()
             try:
                 rows = search_top_k(conn, qvec, TOP_K)
             finally:
                 conn.close()
-            # Print results
+            # Display search results
             print("\nTop results:")
             for i, r in enumerate(rows, 1):
                 print(f"\n#{i} | sim={r['similarity']:.3f} | file={r['file_name']} | strategy={r['split_strategy']}")

@@ -73,7 +73,7 @@ def get_db_conn():
 
 
 def ensure_schema(conn) -> None:
-    """Create the single table if it doesn't exist. Sets VECTOR(EMBED_DIM)."""
+    """Create the indexed_chunks table and indexes if they don't exist."""
     with conn.cursor() as cur:
         cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
         cur.execute(
@@ -159,16 +159,17 @@ def extract_text_docx(path: str) -> str:
 
 
 def normalize_text(text: str) -> str:
-    # Collapse space but preserve paragraph breaks
+    """Clean up text formatting while preserving paragraph structure."""
     text = text.replace("\r", "\n")
-    text = re.sub(r"\n{3,}", "\n\n", text)
-    text = re.sub(r"[\t\x0b\x0c]", " ", text)
-    text = re.sub(r" +", " ", text)
-    text = re.sub(r" *\n *", "\n", text)
+    text = re.sub(r"\n{3,}", "\n\n", text)  # Limit consecutive newlines
+    text = re.sub(r"[\t\x0b\x0c]", " ", text)  # Replace tabs/form feeds with spaces
+    text = re.sub(r" +", " ", text)  # Collapse multiple spaces
+    text = re.sub(r" *\n *", "\n", text)  # Clean up spaces around newlines
     return text.strip()
 
 
 def extract_text(file_path: str) -> str:
+    """Extract and normalize text from PDF or DOCX files."""
     ftype = detect_file_type(file_path)
     if ftype == "pdf":
         return extract_text_pdf(file_path)
@@ -188,9 +189,7 @@ except Exception:
 
 
 def split_text(text: str, strategy: str) -> List[str]:
-    """Returns a list of chunk strings according to strategy.
-    Prefers LangChain splitters when available; otherwise falls back to local implementations.
-    """
+    """Split text into chunks using LangChain splitters ('fixed', 'sentence', or 'paragraph')."""
     strategy = strategy.lower()
 
     if _HAS_LANGCHAIN:
@@ -271,16 +270,18 @@ def _embed_one(text: str) -> List[float]:
 
 
 def embed_chunks(chunks: List[str]) -> List[List[float]]:
-    """Embed each chunk sequentially with retries. Keeps it simple and robust."""
+    """Generate embeddings for text chunks using Gemini API.
+    
+    Processes chunks sequentially with rate limiting and progress logging.
+    """
     embeddings: List[List[float]] = []
     for idx, ch in enumerate(chunks, 1):
         ch = ch.strip()
         if not ch:
-            # Keep alignment: still push an empty vector (or skip). We'll skip.
-            continue
+            continue  # Skip empty chunks
         vec = _embed_one(ch)
         embeddings.append(vec)
-        time.sleep(EMBED_SLEEP)
+        time.sleep(EMBED_SLEEP)  # Rate limiting
         if idx % 10 == 0:
             logging.info("Embedded %d/%d chunks", idx, len(chunks))
     return embeddings
@@ -289,6 +290,7 @@ def embed_chunks(chunks: List[str]) -> List[List[float]]:
 # Pipeline with logging
 
 def run_indexing(file_path: str, strategy: str) -> None:
+    """Main pipeline: extract text, chunk it, generate embeddings, and store in database."""
     start = time.time()
     file_name = os.path.basename(file_path)
     logging.info("Reading: %s", file_name)
@@ -306,8 +308,7 @@ def run_indexing(file_path: str, strategy: str) -> None:
     logging.info("Embedding %d chunks with Gemini (%s)", len(chunks), EMBED_MODEL)
     vectors = embed_chunks(chunks)
     if len(vectors) != len(chunks):
-        # In case of skips, keep only aligned pairs
-        pairs = [(c, v) for c, v in zip(chunks, vectors)]
+        pairs = [(c, v) for c, v in zip(chunks, vectors)]  # Handle skipped chunks
     else:
         pairs = list(zip(chunks, vectors))
 
