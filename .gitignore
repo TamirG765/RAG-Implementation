@@ -1,2 +1,4 @@
 .env
 CLAUDE.md
+.gitignore
+__pycache__
