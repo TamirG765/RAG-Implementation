@@ -23,7 +23,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 def interactive_loop() -> None:
-    """Main interactive search loop - prompts for queries and displays results."""
+    """Main interactive search loop for processing user queries and displaying results."""
     print("\nType your question and press Enter. Empty input exits.\n")
     while True:
         try:
@@ -53,6 +53,7 @@ def interactive_loop() -> None:
 
 
 def setup_logger(level: str = "INFO") -> None:
+    """Configure logging with specified level and format."""
     logging.basicConfig(
         level=getattr(logging, level.upper(), logging.INFO),
         format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
@@ -61,6 +62,7 @@ def setup_logger(level: str = "INFO") -> None:
 
 
 def main() -> None:
+    """Initialize logging and start the interactive search loop."""
     setup_logger()
     interactive_loop()
 

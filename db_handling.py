@@ -22,14 +22,14 @@ POSTGRES_URL = os.getenv("POSTGRES_URL", "postgresql://postgres:postgres@localho
 
 
 def get_db_connection():
-    """Open a new psycopg connection and register pgvector."""
+    """Create and return a PostgreSQL connection with pgvector support."""
     conn = psycopg.connect(POSTGRES_URL)
     register_vector(conn)
     return conn
 
 
 def ensure_schema(conn) -> None:
-    """Create the indexed_chunks table and indexes if they don't exist."""
+    """Create the indexed_chunks table and database indexes if needed."""
     with conn.cursor() as cur:
         cur.execute("CREATE EXTENSION IF NOT EXISTS vector;")
         cur.execute(
@@ -54,7 +54,7 @@ def ensure_schema(conn) -> None:
 
 
 def insert_chunks(conn, file_name: str, strategy: str, chunk_data: List[tuple[str, list[float]]]) -> int:
-    """Bulk insert chunk rows. Each row is (chunk_text, embedding). Returns number inserted."""
+    """Bulk insert chunk data into database and return count of inserted rows."""
     if not chunk_data:
         return 0
     with conn.cursor() as cur:
@@ -69,7 +69,7 @@ def insert_chunks(conn, file_name: str, strategy: str, chunk_data: List[tuple[st
 
 
 def search_similar_chunks(conn, query_embedding: List[float], top_k: int = TOP_K) -> List[Dict[str, Any]]:
-    """Find top-k most similar chunks using cosine similarity, returns list of dicts with chunk data and scores."""
+    """Find top-k most similar chunks using cosine similarity search."""
     sql_query = (
         "SELECT id, file_name, split_strategy, created_at, chunk_text, "
         "1 - (embedding <=> %s) AS similarity "

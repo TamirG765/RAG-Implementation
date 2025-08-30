@@ -46,7 +46,8 @@ CHUNK_SIZE = 800                            # characters per chunk for packing
 CHUNK_OVERLAP = 200                         # overlap in characters between adjacent chunks
 
 
-def detect_file_type(path: str) -> str:
+def _detect_file_type(path: str) -> str:
+    """Detect file type based on file extension (pdf or docx)."""
     lowercase_file_path = path.lower()
     if lowercase_file_path.endswith(".pdf"):
         return "pdf"
@@ -55,7 +56,8 @@ def detect_file_type(path: str) -> str:
     raise ValueError("Unsupported file type. Use .pdf or .docx")
 
 
-def extract_text_pdf(path: str) -> str:
+def _extract_text_pdf(path: str) -> str:
+    """Extract and normalize text content from a PDF file."""
     reader = PdfReader(path)
     pages = []
     for page in reader.pages:
@@ -64,17 +66,18 @@ def extract_text_pdf(path: str) -> str:
         except Exception:
             pages.append("")
     text = "\n\n".join(pages)
-    return normalize_text(text)
+    return _normalize_text(text)
 
 
-def extract_text_docx(path: str) -> str:
+def _extract_text_docx(path: str) -> str:
+    """Extract and normalize text content from a DOCX file."""
     doc = Document(path)
     paragraphs = [p.text for p in doc.paragraphs]
     text = "\n".join(paragraphs)
-    return normalize_text(text)
+    return _normalize_text(text)
 
 
-def normalize_text(text: str) -> str:
+def _normalize_text(text: str) -> str:
     """Clean up text formatting while preserving paragraph structure."""
     text = text.replace("\r", "\n")
     text = re.sub(r"\n{3,}", "\n\n", text)  # Limit consecutive newlines
@@ -86,16 +89,16 @@ def normalize_text(text: str) -> str:
 
 def extract_text(file_path: str) -> str:
     """Extract and normalize text from PDF or DOCX files."""
-    file_type = detect_file_type(file_path)
+    file_type = _detect_file_type(file_path)
     if file_type == "pdf":
-        return extract_text_pdf(file_path)
+        return _extract_text_pdf(file_path)
     elif file_type == "docx":
-        return extract_text_docx(file_path)
+        return _extract_text_docx(file_path)
     raise AssertionError("unreachable")
 
 
 def split_text(text: str, strategy: str) -> List[str]:
-    """Split text into chunks using LangChain splitters ('fixed', 'sentence', or 'paragraph')."""
+    """Split text into chunks using the specified strategy (fixed/sentence/paragraph)."""
     strategy = strategy.lower()
 
     if strategy == "fixed":
@@ -128,7 +131,7 @@ def split_text(text: str, strategy: str) -> List[str]:
 
 
 def run_indexing(file_path: str, strategy: str) -> None:
-    """Main pipeline: extract text, chunk it, generate embeddings, and store in database."""
+    """Main pipeline to extract, chunk, embed, and store document content."""
     start_time = time.time()
     file_name = os.path.basename(file_path)
     logging.info("Reading: %s", file_name)
@@ -162,6 +165,7 @@ def run_indexing(file_path: str, strategy: str) -> None:
 
 
 def setup_logger(level: str = "INFO") -> None:
+    """Configure logging with specified level and format."""
     logging.basicConfig(
         level=getattr(logging, level.upper(), logging.INFO),
         format="%(asctime)s | %(levelname)s | %(message)s",
@@ -170,6 +174,7 @@ def setup_logger(level: str = "INFO") -> None:
 
 
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
+    """Parse command line arguments for file path and chunking strategy."""
     argument_parser = argparse.ArgumentParser(description="Index a document into pgvector (single-table)")
     argument_parser.add_argument("--file", required=True, help="Path to .pdf or .docx file")
     argument_parser.add_argument("--strategy", required=True, choices=["fixed", "sentence", "paragraph"], help="Chunking strategy")

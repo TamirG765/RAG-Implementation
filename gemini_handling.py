@@ -39,7 +39,7 @@ def configure_gemini():
 
 @retry(wait=wait_exponential_jitter(1, 4, 0.1), stop=stop_after_attempt(5))
 def embed_single_text(text: str) -> List[float]:
-    """Embed a single text chunk with retries. Returns a list of floats."""
+    """Embed a single text chunk with retries and return embedding vector."""
     configure_gemini()
     resp = genai.embed_content(model=EMBED_MODEL, content=text)
     vec = getattr(resp, "embedding", None) or resp.get("embedding")
@@ -51,15 +51,12 @@ def embed_single_text(text: str) -> List[float]:
 
 
 def embed_query(text: str) -> List[float]:
-    """Generate embedding for search query using Gemini API."""
+    """Generate embedding vector for a search query text."""
     return embed_single_text(text)
 
 
 def embed_chunks(chunks: List[str]) -> List[List[float]]:
-    """Generate embeddings for multiple text chunks using Gemini API.
-    
-    Processes chunks sequentially with rate limiting and progress logging.
-    """
+    """Generate embedding vectors for multiple text chunks with rate limiting."""
     embeddings: List[List[float]] = []
     for idx, ch in enumerate(chunks, 1):
         ch = ch.strip()

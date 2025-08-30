@@ -1,8 +1,8 @@
-psycopg
-pgvector
-pypdf
-python-docx
-google-generativeai
-tenacity
-python-dotenv
-langchain-text-splitters
+psycopg==3.2.9
+pgvector==0.4.1
+pypdf==6.0.0
+python-docx==1.2.0
+google-generativeai==0.8.5
+tenacity==9.1.2
+python-dotenv==1.1.1
+langchain-text-splitters==0.3.9

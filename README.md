@@ -49,7 +49,7 @@ GEMINI_API_KEY="your_gemini_api_key_here"
 ### 3. Install Dependencies
 ```bash
 # Create environment
-conda create -n rag python=3.11
+conda create -n rag python=3.13
 conda activate rag
 ```
 
