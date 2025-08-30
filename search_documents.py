@@ -15,10 +15,10 @@ python search_documents.py
 """
 import logging
 
-from dotenv import load_dotenv
-
 from gemini_handling import embed_query
 from db_handling import get_db_connection, search_similar_chunks, TOP_K
+
+from dotenv import load_dotenv
 
 load_dotenv()
 
@@ -27,25 +27,25 @@ def interactive_loop() -> None:
     print("\nType your question and press Enter. Empty input exits.\n")
     while True:
         try:
-            q = input("Query> ").strip()
+            user_query = input("Query> ").strip()
         except (EOFError, KeyboardInterrupt):
             print("\nBye for now.")
             return
-        if not q:
+        if not user_query:
             print("Bye for now.")
             return
         try:
-            qvec = embed_query(q)  # Convert query to embedding
-            conn = get_db_connection()
+            query_embedding = embed_query(user_query)  # Convert query to embedding
+            db_connection = get_db_connection()
             try:
-                rows = search_similar_chunks(conn, qvec, TOP_K)
+                search_results = search_similar_chunks(db_connection, query_embedding, TOP_K)
             finally:
-                conn.close()
+                db_connection.close()
             # Display search results
             print("\nTop results:")
-            for i, r in enumerate(rows, 1):
-                print(f"\n#{i} | sim={r['similarity']:.3f} | file={r['file_name']} | strategy={r['split_strategy']}")
-                print(r["chunk_text"])
+            for i, result in enumerate(search_results, 1):
+                print(f"\n#{i} | sim={result['similarity']:.3f} | file={result['file_name']} | strategy={result['split_strategy']}")
+                print(result["chunk_text"])
             print("\n— End of results —\n")
         except Exception as e:
             logging.exception("Search failed: %s", e)

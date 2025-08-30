@@ -1,7 +1,7 @@
 """
 index_documents.py — Table indexer for RAG
 
-Gaol
+Goal
 -------
 Ingest a PDF/DOCX file, split it into chunks (one of: fixed|sentence|paragraph),
 create Gemini embeddings for each chunk, and persist rows into a single
@@ -28,7 +28,6 @@ import sys
 import time
 from typing import Iterable, List
 
-from dotenv import load_dotenv 
 from pypdf import PdfReader
 from docx import Document
 from langchain_text_splitters import (
@@ -39,6 +38,8 @@ from langchain_text_splitters import (
 from gemini_handling import embed_chunks
 from db_handling import get_db_connection, ensure_schema, insert_chunks
 
+from dotenv import load_dotenv
+
 load_dotenv()
 
 CHUNK_SIZE = 800                            # characters per chunk for packing
@@ -46,10 +47,10 @@ CHUNK_OVERLAP = 200                         # overlap in characters between adja
 
 
 def detect_file_type(path: str) -> str:
-    path_lower = path.lower()
-    if path_lower.endswith(".pdf"):
+    lowercase_file_path = path.lower()
+    if lowercase_file_path.endswith(".pdf"):
         return "pdf"
-    if path_lower.endswith(".docx"):
+    if lowercase_file_path.endswith(".docx"):
         return "docx"
     raise ValueError("Unsupported file type. Use .pdf or .docx")
 
@@ -57,9 +58,9 @@ def detect_file_type(path: str) -> str:
 def extract_text_pdf(path: str) -> str:
     reader = PdfReader(path)
     pages = []
-    for p in reader.pages:
+    for page in reader.pages:
         try:
-            pages.append(p.extract_text() or "")
+            pages.append(page.extract_text() or "")
         except Exception:
             pages.append("")
     text = "\n\n".join(pages)
@@ -68,8 +69,8 @@ def extract_text_pdf(path: str) -> str:
 
 def extract_text_docx(path: str) -> str:
     doc = Document(path)
-    paras = [p.text for p in doc.paragraphs]
-    text = "\n".join(paras)
+    paragraphs = [p.text for p in doc.paragraphs]
+    text = "\n".join(paragraphs)
     return normalize_text(text)
 
 
@@ -85,10 +86,10 @@ def normalize_text(text: str) -> str:
 
 def extract_text(file_path: str) -> str:
     """Extract and normalize text from PDF or DOCX files."""
-    ftype = detect_file_type(file_path)
-    if ftype == "pdf":
+    file_type = detect_file_type(file_path)
+    if file_type == "pdf":
         return extract_text_pdf(file_path)
-    elif ftype == "docx":
+    elif file_type == "docx":
         return extract_text_docx(file_path)
     raise AssertionError("unreachable")
 
@@ -104,7 +105,7 @@ def split_text(text: str, strategy: str) -> List[str]:
             chunk_overlap=CHUNK_OVERLAP,
             length_function=len,
         )
-        return [c for c in splitter.split_text(text) if c.strip()]
+        return [chunk for chunk in splitter.split_text(text) if chunk.strip()]
 
     if strategy == "sentence":
         SENTENCE_CHUNK_SIZE = 100
@@ -114,7 +115,7 @@ def split_text(text: str, strategy: str) -> List[str]:
             chunk_overlap=SENTENCE_CHUNK_OVERLAP,
             separators=[". ", "! ", "? ", "\n"]
         )
-        return [c.strip() for c in splitter.split_text(text) if c.strip()]
+        return [chunk.strip() for chunk in splitter.split_text(text) if chunk.strip()]
 
     if strategy == "paragraph":
         splitter = CharacterTextSplitter(
@@ -123,12 +124,12 @@ def split_text(text: str, strategy: str) -> List[str]:
             chunk_overlap=CHUNK_OVERLAP,
             length_function=len,
         )
-        return [c for c in splitter.split_text(text) if c.strip()]
+        return [chunk for chunk in splitter.split_text(text) if chunk.strip()]
 
 
 def run_indexing(file_path: str, strategy: str) -> None:
     """Main pipeline: extract text, chunk it, generate embeddings, and store in database."""
-    start = time.time()
+    start_time = time.time()
     file_name = os.path.basename(file_path)
     logging.info("Reading: %s", file_name)
     raw_text = extract_text(file_path)
@@ -143,21 +144,21 @@ def run_indexing(file_path: str, strategy: str) -> None:
         return
 
     logging.info("Embedding %d chunks with Gemini", len(chunks))
-    vectors = embed_chunks(chunks)
-    if len(vectors) != len(chunks):
-        pairs = [(c, v) for c, v in zip(chunks, vectors)]  # Handle skipped chunks
+    embedding_vectors = embed_chunks(chunks)
+    if len(embedding_vectors) != len(chunks):
+        chunk_embedding_pairs = [(chunk, vector) for chunk, vector in zip(chunks, embedding_vectors)]  # Handle skipped chunks
     else:
-        pairs = list(zip(chunks, vectors))
+        chunk_embedding_pairs = list(zip(chunks, embedding_vectors))
 
-    conn = get_db_connection()
+    db_connection = get_db_connection()
     try:
-        ensure_schema(conn)
-        inserted = insert_chunks(conn, file_name, strategy, pairs)
+        ensure_schema(db_connection)
+        inserted_count = insert_chunks(db_connection, file_name, strategy, chunk_embedding_pairs)
     finally:
-        conn.close()
+        db_connection.close()
 
-    elapsed = time.time() - start
-    logging.info("✅ Indexed %d chunks from %s (strategy=%s) in %.2fs", inserted, file_name, strategy, elapsed)
+    elapsed_time = time.time() - start_time
+    logging.info("✅ Indexed %d chunks from %s (strategy=%s) in %.2fs", inserted_count, file_name, strategy, elapsed_time)
 
 
 def setup_logger(level: str = "INFO") -> None:
@@ -169,10 +170,10 @@ def setup_logger(level: str = "INFO") -> None:
 
 
 def parse_args(argv: Iterable[str] | None = None) -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Index a document into pgvector (single-table)")
-    p.add_argument("--file", required=True, help="Path to .pdf or .docx file")
-    p.add_argument("--strategy", required=True, choices=["fixed", "sentence", "paragraph"], help="Chunking strategy")
-    return p.parse_args(argv)
+    argument_parser = argparse.ArgumentParser(description="Index a document into pgvector (single-table)")
+    argument_parser.add_argument("--file", required=True, help="Path to .pdf or .docx file")
+    argument_parser.add_argument("--strategy", required=True, choices=["fixed", "sentence", "paragraph"], help="Chunking strategy")
+    return argument_parser.parse_args(argv)
 
 
 if __name__ == "__main__":
