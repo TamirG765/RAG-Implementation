@@ -2,7 +2,7 @@
 
 # RAG Document Search System
 
-A Retrieval-Augmented Generation (RAG) system that converts PDF and DOCX documents into vector embeddings and enables semantic search over the content using PostgreSQL with pgvector.
+A Retrieval-Augmented Generation (RAG) system that converts PDF and DOCX documents into vector embeddings and enables semantic search over the content using PostgreSQL.
 
 ## How It Works
 
@@ -12,7 +12,7 @@ A Retrieval-Augmented Generation (RAG) system that converts PDF and DOCX documen
 ## Features
 
 - **Document Support**: PDF and DOCX files
-- **Chunking Strategies**: Fixed-size, sentence-based, or paragraph-based splitting
+- **Chunking Strategies**: Fixed-size, sentence-based or paragraph-based splitting
 - **Vector Embeddings**: Gemini `text-embedding-004` model
 - **Similarity Search**: Cosine similarity using PostgreSQL pgvector extension
 - **Interactive Search**: Command-line interface for querying indexed documents
